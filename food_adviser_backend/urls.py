@@ -21,4 +21,5 @@ from recipes import views
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('recipes/', include('recipes.urls')),
+    path('ingredients/', include('ingredients.urls')), 
 ]
