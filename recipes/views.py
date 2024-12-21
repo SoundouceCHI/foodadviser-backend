@@ -33,4 +33,3 @@ def get_recipes_list(request):
     else:
         return JsonResponse({"error": "Unable to fetch recipes list"}, status=500)
 
-
