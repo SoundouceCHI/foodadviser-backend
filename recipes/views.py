@@ -7,7 +7,7 @@ from .models import Recipe, Nutrition
 
 load_dotenv()
 
-api_key = os.getenv('API_KEY_D')
+api_key = os.getenv('API_KEY')
 
 def get_recipe(request, recipe_id):
     cache_key = f"recipe_{recipe_id}"
@@ -43,8 +43,7 @@ def get_recipes_list(request):
         data = response.json()
         
         # Sauvegarder les recettes (si nécessaire)
-        for recipe in data.get('results', []):  
-            print("recipeeeeeeeeeee", recipe)
+        for recipe in data.get('results', []):
             save_recipe(recipe)
 
         return JsonResponse(data)
@@ -54,7 +53,6 @@ def get_recipes_list(request):
         return JsonResponse({"error": "Unable to fetch recipes list"}, status=500)
 
 def save_recipe(recipe):
-    print(f"Data received for recipeeeeeeee: {recipe}") 
     recipe_id = recipe.get('id')
     url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
     response = requests.get(url)
@@ -106,3 +104,29 @@ def save_recipe(recipe):
         })
     else:
         return JsonResponse({"error": "Unable to fetch recipe data"}, status=response.status_code)
+    
+
+def getRecipesSuggestionList(request): 
+    ingredients = request.GET.get('list', '')
+    number= int(request.GET.get('number', 8))
+    print("Ingredients:", ingredients)
+    print("Number:", number)
+
+    if not ingredients:
+            return JsonResponse({"error": "Missing 'list' parameter"}, status=400)
+    
+    url=(
+            f'https://api.spoonacular.com/recipes/findByIngredients'
+            f'?ingredients={ingredients}&number={number}&apiKey={api_key}'
+        )
+    
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+        return JsonResponse(data, safe=False)
+    
+    elif response.status_code == 402:
+        return JsonResponse({"error": "Daily points limit reached. Please try again tomorrow."}, status=402)
+    else:
+        return JsonResponse({"error": "Unable to fetch recipes list"}, status=500)
