@@ -30,7 +30,7 @@ def get_recipe(request, recipe_id):
 def get_recipes_list(request):
     number = request.GET.get('number', 100)  
 
-    url = f'https://api.spoonacular.com/recipes/complexSearch?apiKey={API_KEY}&number={number}'
+    url = f'https://api.spoonacular.com/recipes/complexSearch?apiKey={api_key}&number={number}'
     response = requests.get(url)
 
     if response.status_code == 200:
