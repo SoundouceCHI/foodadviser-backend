@@ -14,7 +14,21 @@ api_key = os.getenv('API_KEY_S')
 def get_recipe(request, recipe_id):
     try:
         recipe = Recipe.objects.get(id_recipe=recipe_id)
-        nutrition = Nutrition.objects.filter(recipe=recipe).first()  
+        nutrition = Nutrition.objects.filter(recipe=recipe).first()
+
+        recipe_ingredients = RecipeIngr.objects.filter(recipe=recipe)
+        ingredients_data = []
+
+        for recipe_ingredient in recipe_ingredients:
+            ingredient = recipe_ingredient.ingredient
+            unit = recipe_ingredient.unit
+            ingredient_data = {
+                'ingredient_name': ingredient.name,
+                'amount': recipe_ingredient.amount,
+                'unit': unit.name if unit else None,
+                'image_url': ingredient.image_url  
+            }
+            ingredients_data.append(ingredient_data)
 
         data = {
             'id_recipe': recipe.id_recipe,
@@ -30,6 +44,7 @@ def get_recipe(request, recipe_id):
             'cooking_minutes': recipe.cooking_minutes,
             'health_score': recipe.health_score,
             'steps': recipe.steps,
+            'ingredients': ingredients_data,  
             'nutrition': {
                 'calories': nutrition.calories if nutrition else None,
                 'protein': nutrition.protein if nutrition else None,
@@ -40,9 +55,12 @@ def get_recipe(request, recipe_id):
                 'sodium': nutrition.sodium if nutrition else None,
             } if nutrition else None,
         }
+
         return JsonResponse(data)
+
     except Recipe.DoesNotExist:
         return JsonResponse({"error": "Recipe not found"}, status=404)
+
 
 
 def get_recipes_list(request):
