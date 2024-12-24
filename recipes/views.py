@@ -4,10 +4,12 @@ from django.http import JsonResponse
 from dotenv import load_dotenv
 import os
 from .models import Recipe, Nutrition
+from recipeingredient.models import UnitIngr, RecipeIngr
+from ingredients.models import Ingredient
 
 load_dotenv()
 
-api_key = os.getenv('API_KEY')
+api_key = os.getenv('API_KEY_S')
 
 def get_recipe(request, recipe_id):
     try:
@@ -61,8 +63,6 @@ def get_recipes_list(request):
         })
 
     return JsonResponse({'recipes': recipes_data})
-
-
     
 
 def getRecipesSuggestionList(request): 
