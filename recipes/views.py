@@ -10,7 +10,7 @@ from ingredients.models import Ingredient
 load_dotenv()
 
 api_key = os.getenv('API_KEY_S')
-
+api_key = "a6ff6d0f5332499b811cc6a8f2d8b656"
 def get_recipe(request, recipe_id):
     try:
         recipe = Recipe.objects.get(id_recipe=recipe_id)
@@ -81,7 +81,121 @@ def get_recipes_list(request):
         })
 
     return JsonResponse({'recipes': recipes_data})
+
+def save_recipe(recipe):
+    print(f"Data received ") 
+    recipe_id = recipe.get('id')
+    url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        steps = [
+            {"number": step['number'], "step": step['step']}
+            for instruction in data.get('analyzedInstructions', [])
+            for step in instruction.get('steps', [])
+        ]
+        
+        recipe, created = Recipe.objects.get_or_create(
+            id_recipe=recipe_id,
+            defaults={
+                'title': data.get('title', ''),
+                'image_url': data.get('image', ''),
+                'instructions': data.get('instructions', ''),
+                'steps': steps,
+                'servings': data.get('servings', 1),
+                'ready_in_minutes': data.get('readyInMinutes', 0),
+                'vegetarian': data.get('vegetarian', False),
+                'vegan': data.get('vegan', False),
+                'very_popular': data.get('veryPopular', False),
+                'preparation_minutes': data.get('preparationMinutes', None),
+                'cooking_minutes': data.get('cookingMinutes', None),
+                'health_score': data.get('healthScore', None),
+            }
+        )
+        
+        if created:
+            nutrition_data = data.get('nutrition', {}).get('nutrients', [])
+            nutrition_values = {nutrient['name']: nutrient['amount'] for nutrient in nutrition_data}
+            Nutrition.objects.create(
+                recipe=recipe,
+                calories=nutrition_values.get('Calories', None),
+                protein=nutrition_values.get('Protein', None),
+                fat=nutrition_values.get('Fat', None),
+                carbohydrates=nutrition_values.get('Carbohydrates', None),
+                sugar=nutrition_values.get('Sugar', None),
+                fiber=nutrition_values.get('Fiber', None),
+                sodium=nutrition_values.get('Sodium', None),
+            )
+        return JsonResponse({
+            "message": "Recipe saved successfully!" if created else "Recipe already exists in the database!"
+        })
+    else:
+        return JsonResponse({"error": "Unable to fetch recipe data"}, status=response.status_code)  
     
+def get_recipe_and_populate_ingredients(recipe_id):
+    url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        data = response.json()
+
+        save_recipe(data)
+
+        ingredients_data = data.get("extendedIngredients", [])
+        try:
+
+            # Précharger les unités et ingrédients existants
+            existing_units = {unit.name: unit for unit in UnitIngr.objects.all()}
+            existing_ingredients = {ingredient.id_ingredient: ingredient for ingredient in Ingredient.objects.all()}
+
+            for ingredient_data in ingredients_data:
+                ingredient_name = ingredient_data["name"]
+                amount = ingredient_data["amount"]
+                unit_name = ingredient_data["unit"]
+                ingredient_id = ingredient_data["id"]
+
+                # Gérer l'unité (ajout ou récupération de l'unité)
+                unit = existing_units.get(unit_name)
+                if not unit:
+                    unit, created = UnitIngr.objects.get_or_create(name=unit_name)
+                    existing_units[unit_name] = unit
+
+                # Gérer l'ingrédient (ajout ou mise à jour)
+                ingredient = existing_ingredients.get(ingredient_id)
+                if not ingredient:
+                    ingredient, created = Ingredient.objects.get_or_create(
+                        id_ingredient=ingredient_id,
+                        defaults={'name': ingredient_name}
+                    )
+                    existing_ingredients[ingredient_id] = ingredient
+                else:
+                    # Si l'ingrédient existe déjà, mettre à jour son nom si nécessaire
+                    if ingredient.name != ingredient_name:
+                        ingredient.name = ingredient_name
+                        ingredient.save()
+
+                # Ajouter ou récupérer l'entrée dans RecipeIngr (assurer l'unicité)
+                recipe_ingredient, created = RecipeIngr.objects.get_or_create(
+                    recipe=Recipe.objects.get(id_recipe=recipe_id),
+                    ingredient=ingredient,
+                    amount=amount,
+                    unit=unit
+                )
+
+                # Log des ajouts ou mises à jour
+                if created:
+                    print(f"Added {ingredient_name} to recipe {recipe_id} with amount {amount} {unit_name}")
+                else:
+                    print(f"Updated {ingredient_name} in recipe {recipe_id}")
+
+        except Recipe.DoesNotExist:
+            print(f"Recipe with id {recipe_id} not found.")
+        except Exception as e:
+            print(f"An error occurred while processing recipe {recipe_id}: {e}")
+
+    else:
+        print(f"Error fetching details for recipe {recipe_id}. Status code: {response.status_code}")
+
 
 def getRecipesSuggestionList(request): 
     ingredients = request.GET.get('list', '')
@@ -101,6 +215,15 @@ def getRecipesSuggestionList(request):
 
     if response.status_code == 200:
         data = response.json()
+        for recipe_data in data:
+            recipe_id = recipe_data['id']
+            try:
+                recipe = Recipe.objects.get(id_recipe=recipe_id)
+                print(f"Recipe {recipe_id} already exists in the database.")
+            except Recipe.DoesNotExist:
+                print(f"Recipe {recipe_id} does not exist. Fetching and populating ingredients...")
+                get_recipe_and_populate_ingredients(recipe_id)
+        
         return JsonResponse(data, safe=False)
     
     elif response.status_code == 402:
