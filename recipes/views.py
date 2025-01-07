@@ -10,7 +10,7 @@ from ingredients.models import Ingredient
 load_dotenv()
 
 api_key = os.getenv('API_KEY_S')
-api_key = "a6ff6d0f5332499b811cc6a8f2d8b656"
+
 def get_recipe(request, recipe_id):
     try:
         recipe = Recipe.objects.get(id_recipe=recipe_id)
@@ -144,7 +144,7 @@ def get_recipe_and_populate_ingredients(recipe_id):
         ingredients_data = data.get("extendedIngredients", [])
         try:
 
-            # Précharger les unités et ingrédients existants
+            # Preload existing units and ingredients
             existing_units = {unit.name: unit for unit in UnitIngr.objects.all()}
             existing_ingredients = {ingredient.id_ingredient: ingredient for ingredient in Ingredient.objects.all()}
 
@@ -154,13 +154,13 @@ def get_recipe_and_populate_ingredients(recipe_id):
                 unit_name = ingredient_data["unit"]
                 ingredient_id = ingredient_data["id"]
 
-                # Gérer l'unité (ajout ou récupération de l'unité)
+                # Handle the unit (add or retrieve the unit)
                 unit = existing_units.get(unit_name)
                 if not unit:
                     unit, created = UnitIngr.objects.get_or_create(name=unit_name)
                     existing_units[unit_name] = unit
 
-                # Gérer l'ingrédient (ajout ou mise à jour)
+                # Handle the ingredient (add or update)
                 ingredient = existing_ingredients.get(ingredient_id)
                 if not ingredient:
                     ingredient, created = Ingredient.objects.get_or_create(
@@ -169,12 +169,12 @@ def get_recipe_and_populate_ingredients(recipe_id):
                     )
                     existing_ingredients[ingredient_id] = ingredient
                 else:
-                    # Si l'ingrédient existe déjà, mettre à jour son nom si nécessaire
+                    # If the ingredient already exists, update its name if necessary
                     if ingredient.name != ingredient_name:
                         ingredient.name = ingredient_name
                         ingredient.save()
 
-                # Ajouter ou récupérer l'entrée dans RecipeIngr (assurer l'unicité)
+                # Add or retrieve the entry in RecipeIngr (ensure uniqueness)
                 recipe_ingredient, created = RecipeIngr.objects.get_or_create(
                     recipe=Recipe.objects.get(id_recipe=recipe_id),
                     ingredient=ingredient,
@@ -182,7 +182,7 @@ def get_recipe_and_populate_ingredients(recipe_id):
                     unit=unit
                 )
 
-                # Log des ajouts ou mises à jour
+                # Log 
                 if created:
                     print(f"Added {ingredient_name} to recipe {recipe_id} with amount {amount} {unit_name}")
                 else:
