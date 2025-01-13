@@ -59,9 +59,22 @@ def get_recipe(request, recipe_id):
         return JsonResponse(data)
 
     except Recipe.DoesNotExist:
-        return JsonResponse({"error": "Recipe not found"}, status=404)
+        print("Recipe is not exist in BDD.. Trying to ask api...")
+        return get_recipe_from_spoon(recipe_id)
 
-
+def get_recipe_from_spoon(recipe_id):
+    print('Spoonacular')
+    url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
+    response = requests.get(url)
+    try:
+        if response.status_code == 200:
+            data = response.json()
+            return JsonResponse(data)
+        else:
+            return JsonResponse({"error": "Unable to fetch recipe data from API"}, status=500)
+    except Exception as e:
+        print("Unexpected error during API fetch")
+        return JsonResponse({"error": "Unexpected error occurred while fetching data from API"}, status=500)
 
 def get_recipes_list(request):
     number = int(request.GET.get('number', 100))  
@@ -81,57 +94,6 @@ def get_recipes_list(request):
         })
 
     return JsonResponse({'recipes': recipes_data})
-
-def save_recipe(recipe):
-    print(f"Data received ") 
-    recipe_id = recipe.get('id')
-    url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        steps = [
-            {"number": step['number'], "step": step['step']}
-            for instruction in data.get('analyzedInstructions', [])
-            for step in instruction.get('steps', [])
-        ]
-        
-        recipe, created = Recipe.objects.get_or_create(
-            id_recipe=recipe_id,
-            defaults={
-                'title': data.get('title', ''),
-                'image_url': data.get('image', ''),
-                'instructions': data.get('instructions', ''),
-                'steps': steps,
-                'servings': data.get('servings', 1),
-                'ready_in_minutes': data.get('readyInMinutes', 0),
-                'vegetarian': data.get('vegetarian', False),
-                'vegan': data.get('vegan', False),
-                'very_popular': data.get('veryPopular', False),
-                'preparation_minutes': data.get('preparationMinutes', None),
-                'cooking_minutes': data.get('cookingMinutes', None),
-                'health_score': data.get('healthScore', None),
-            }
-        )
-        
-        if created:
-            nutrition_data = data.get('nutrition', {}).get('nutrients', [])
-            nutrition_values = {nutrient['name']: nutrient['amount'] for nutrient in nutrition_data}
-            Nutrition.objects.create(
-                recipe=recipe,
-                calories=nutrition_values.get('Calories', None),
-                protein=nutrition_values.get('Protein', None),
-                fat=nutrition_values.get('Fat', None),
-                carbohydrates=nutrition_values.get('Carbohydrates', None),
-                sugar=nutrition_values.get('Sugar', None),
-                fiber=nutrition_values.get('Fiber', None),
-                sodium=nutrition_values.get('Sodium', None),
-            )
-        return JsonResponse({
-            "message": "Recipe saved successfully!" if created else "Recipe already exists in the database!"
-        })
-    else:
-        return JsonResponse({"error": "Unable to fetch recipe data"}, status=response.status_code)  
-    
 
 def getRecipesSuggestionList(request): 
     ingredients = request.GET.get('list', '')
