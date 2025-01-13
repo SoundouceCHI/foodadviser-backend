@@ -25,6 +25,7 @@ urlpatterns = [
     path('ingredients/', include('ingredients.urls')), 
     path('get_recipes/', include('get_recipes.urls')),
     path('image_manager/', include('image_manager.urls')),
+    path('users/', include('users.urls'))
 ]
 
 if settings.DEBUG:
