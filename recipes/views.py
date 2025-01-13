@@ -132,70 +132,6 @@ def save_recipe(recipe):
     else:
         return JsonResponse({"error": "Unable to fetch recipe data"}, status=response.status_code)  
     
-def get_recipe_and_populate_ingredients(recipe_id):
-    url = f'https://api.spoonacular.com/recipes/{recipe_id}/information?apiKey={api_key}&includeNutrition=true'
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        data = response.json()
-
-        save_recipe(data)
-
-        ingredients_data = data.get("extendedIngredients", [])
-        try:
-
-            # Preload existing units and ingredients
-            existing_units = {unit.name: unit for unit in UnitIngr.objects.all()}
-            existing_ingredients = {ingredient.id_ingredient: ingredient for ingredient in Ingredient.objects.all()}
-
-            for ingredient_data in ingredients_data:
-                ingredient_name = ingredient_data["name"]
-                amount = ingredient_data["amount"]
-                unit_name = ingredient_data["unit"]
-                ingredient_id = ingredient_data["id"]
-
-                # Handle the unit (add or retrieve the unit)
-                unit = existing_units.get(unit_name)
-                if not unit:
-                    unit, created = UnitIngr.objects.get_or_create(name=unit_name)
-                    existing_units[unit_name] = unit
-
-                # Handle the ingredient (add or update)
-                ingredient = existing_ingredients.get(ingredient_id)
-                if not ingredient:
-                    ingredient, created = Ingredient.objects.get_or_create(
-                        id_ingredient=ingredient_id,
-                        defaults={'name': ingredient_name}
-                    )
-                    existing_ingredients[ingredient_id] = ingredient
-                else:
-                    # If the ingredient already exists, update its name if necessary
-                    if ingredient.name != ingredient_name:
-                        ingredient.name = ingredient_name
-                        ingredient.save()
-
-                # Add or retrieve the entry in RecipeIngr (ensure uniqueness)
-                recipe_ingredient, created = RecipeIngr.objects.get_or_create(
-                    recipe=Recipe.objects.get(id_recipe=recipe_id),
-                    ingredient=ingredient,
-                    amount=amount,
-                    unit=unit
-                )
-
-                # Log 
-                if created:
-                    print(f"Added {ingredient_name} to recipe {recipe_id} with amount {amount} {unit_name}")
-                else:
-                    print(f"Updated {ingredient_name} in recipe {recipe_id}")
-
-        except Recipe.DoesNotExist:
-            print(f"Recipe with id {recipe_id} not found.")
-        except Exception as e:
-            print(f"An error occurred while processing recipe {recipe_id}: {e}")
-
-    else:
-        print(f"Error fetching details for recipe {recipe_id}. Status code: {response.status_code}")
-
 
 def getRecipesSuggestionList(request): 
     ingredients = request.GET.get('list', '')
@@ -222,7 +158,6 @@ def getRecipesSuggestionList(request):
                 print(f"Recipe {recipe_id} already exists in the database.")
             except Recipe.DoesNotExist:
                 print(f"Recipe {recipe_id} does not exist. Fetching and populating ingredients...")
-                get_recipe_and_populate_ingredients(recipe_id)
         
         return JsonResponse(data, safe=False)
     
