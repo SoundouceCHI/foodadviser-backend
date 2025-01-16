@@ -159,4 +159,9 @@ def log_request_middleware(get_response):
         return get_response(request)
     return middleware
 
+from datetime import timedelta
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
